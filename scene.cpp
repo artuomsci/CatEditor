@@ -15,6 +15,8 @@
 
 #include "common.h"
 #include "str_utils.h"
+#include "tokenizer.h"
+#include <iostream>
 
 static const char* x_token       = "x_";
 static const char* y_token       = "y_";
@@ -81,12 +83,20 @@ static std::list<Function> function_values(const std::string& source_, const std
 //----------------------------------------------------------------------
 Scene::Scene()
 {
+   //auto ret = Tokenizer::Process("=>-> \"Yes bitch!\", 456, {***} ,, shit");
+   auto ret = Tokenizer::Process("dog=>cat");
+
+   for (auto it : ret)
+   {
+      std::cout << Tokenizer::TokenLog(it, true) << std::endl;
+   }
+
    Init();
 
    m_pMnu = new QMenu(NULL);
 
-   m_pAddProp  = m_pMnu->addAction(tr("Add property"));
-   m_pClone    = m_pMnu->addAction(tr("Clone"));
+   m_pAddProp     = m_pMnu->addAction(tr("Add property"));
+   m_pClone       = m_pMnu->addAction(tr("Clone"));
    m_pCreateArrow = m_pMnu->addAction(tr("Create arrow"));
    m_pDeleteArrow = m_pMnu->addAction(tr("Delete arrows"));
 
