@@ -59,6 +59,9 @@ void MainWindow::createMenu()
    QAction* pNewCategory = new QAction(tr("&New"), this);
    connect(pNewCategory, &QAction::triggered, this, &MainWindow::onNew);
 
+   QAction* pImport = new QAction(tr("&Import"), this);
+   connect(pImport, &QAction::triggered, this, &MainWindow::onImport);
+
    QAction* pFileLoad = new QAction(tr("&Load"), this);
    connect(pFileLoad, &QAction::triggered, this, &MainWindow::onLoad);
 
@@ -70,6 +73,7 @@ void MainWindow::createMenu()
 
    auto pMenu = menuBar()->addMenu(tr("&File"));
    pMenu->addAction(pNewCategory);
+   pMenu->addAction(pImport);
    pMenu->addAction(pFileLoad);
    pMenu->addAction(pFileSave);
    pMenu->addAction(pFileSaveAs);
@@ -223,6 +227,18 @@ void MainWindow::onNew()
 
    m_currentFile.clear();
    setWindowTitle(m_currentFile);
+}
+
+//----------------------------------------------------------------------
+void MainWindow::onImport()
+{
+   QString fileName = QFileDialog::getOpenFileName(this, tr("Open data"), "", tr("Data files (*)"));
+   if (fileName.isEmpty())
+      return;
+
+   m_pScene->New();
+
+   m_pScene->Build(fileName);
 }
 
 //----------------------------------------------------------------------

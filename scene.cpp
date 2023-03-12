@@ -16,6 +16,7 @@
 #include "common.h"
 #include "str_utils.h"
 #include "tokenizer.h"
+#include "parser.h"
 #include <iostream>
 
 static const char* x_token       = "x_";
@@ -58,7 +59,7 @@ static std::string rnd_uuid()
 }
 
 //----------------------------------------------------------------------
-static std::list<Function> function_values(const std::string& source_, const std::string& target_, const cat::Node* const pNode_)
+static std::list<Function> function_values(const std::string& source_, const std::string& target_, std::shared_ptr<cat::Node> pNode_)
 {
    auto target = pNode_->QueryNodes(target_);
    if (target.empty())
@@ -83,14 +84,6 @@ static std::list<Function> function_values(const std::string& source_, const std
 //----------------------------------------------------------------------
 Scene::Scene()
 {
-   //auto ret = Tokenizer::Process("=>-> \"Yes bitch!\", 456, {***} ,, shit");
-   auto ret = Tokenizer::Process("dog=>cat");
-
-   for (auto it : ret)
-   {
-      std::cout << Tokenizer::TokenLog(it, true) << std::endl;
-   }
-
    Init();
 
    m_pMnu = new QMenu(NULL);
@@ -117,7 +110,7 @@ void Scene::Init()
    if (m_pLCategory)
       return;
 
-   m_pLCategory = new Node(Node::NName("Root"), Node::EType::eSCategory);
+   m_pLCategory.reset(new Node(Node::NName("Root"), Node::EType::eSCategory));
 
    setSceneRect(0, 0, scene_size, scene_size);
 
@@ -132,7 +125,6 @@ void Scene::DeInit()
 
    m_pSource = nullptr;
 
-   delete m_pLCategory;
    m_pLCategory = nullptr;
 
    clear();
@@ -1075,6 +1067,39 @@ QList<QMap<QString, QString>> Scene::GetDescription() const
    }
 
    return ret;
+}
+
+//----------------------------------------------------------------------
+bool Scene::Build(const QString& path_)
+{
+   Parser prs;
+   bool result = prs.Parse(path_.toStdString().c_str());
+
+   if (prs.Data()->Type() != Node::EType::eSCategory)
+      return false;
+
+   m_pLCategory = prs.Data();
+
+   for (auto& node : m_pLCategory->QueryNodes("*"))
+   {
+      CNode* pItem = new CNode(scene_size * 0.5, scene_size * 0.5, node.Name().c_str());
+      addItem(pItem);
+
+      connect(pItem, &CNode::positionChanged, this, &Scene::positionChanged);
+   }
+
+   for (auto& arrow : m_pLCategory->QueryArrows("* :: * -> *"))
+   {
+      CNode* pSource = (CNode*)getItem(arrow.Source().c_str());
+      CNode* pTarget = (CNode*)getItem(arrow.Target().c_str());
+
+      CArrow* pItem = new CArrow(pSource, pTarget, arrow.Name().c_str());
+      addItem(pItem);
+   }
+
+   emit updateStatistics(Statistics());
+
+   return result;
 }
 
 //----------------------------------------------------------------------

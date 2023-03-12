@@ -31,6 +31,7 @@ private slots:
    void updateInfo(const QString& str_);
    void updateNodeData(const std::list<cat::Function>& data_);
    void onNew();
+   void onImport();
    void onLoad();
    void onSave();
    void onSaveAs();

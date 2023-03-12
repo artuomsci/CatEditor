@@ -1,6 +1,8 @@
 #ifndef SCENE_H
 #define SCENE_H
 
+#include <memory>
+
 #include <QGraphicsScene>
 #include <QMap>
 
@@ -34,6 +36,7 @@ public:
    void ChangeLabel(const QString& name_);
    QList<QMap<QString, QString>> GetDescription() const;
 
+   bool Build(const QString& path_);
    bool LoadBinary(const QString& path_);
    bool SaveBinary(const QString& path_) const;
 
@@ -61,7 +64,8 @@ private:
    void changeLabel(QGraphicsItem* pItem_) const;
    QMap<QString, QString> getRecord(QGraphicsItem* pItem_) const;
 
-   cat::Node*             m_pLCategory   {};
+   std::shared_ptr<cat::Node>
+                          m_pLCategory   {};
    QGraphicsItem*         m_pSource      {};
    QPointF                m_LastMousePos;
    cat::FunctionName      m_ShownName;
