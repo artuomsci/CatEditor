@@ -1073,9 +1073,10 @@ QList<QMap<QString, QString>> Scene::GetDescription() const
 bool Scene::Build(const QString& path_)
 {
    Parser prs;
-   bool result = prs.Parse(path_.toStdString().c_str());
+   if (!prs.Parse(path_.toStdString().c_str()))
+      return false;
 
-   if (prs.Data()->Type() != Node::EType::eSCategory)
+   if (!prs.Data() || prs.Data()->Type() != Node::EType::eSCategory)
       return false;
 
    m_pLCategory = prs.Data();
@@ -1099,7 +1100,7 @@ bool Scene::Build(const QString& path_)
 
    emit updateStatistics(Statistics());
 
-   return result;
+   return true;
 }
 
 //----------------------------------------------------------------------
