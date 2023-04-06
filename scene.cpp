@@ -1089,7 +1089,7 @@ bool Scene::Build(const QString& path_)
       connect(pItem, &CNode::positionChanged, this, &Scene::positionChanged);
    }
 
-   for (auto& arrow : m_pLCategory->QueryArrows("* :: * -> *"))
+   for (auto& arrow : m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, "*", "*").AsQuery()))
    {
       CNode* pSource = (CNode*)getItem(arrow.Source().c_str());
       CNode* pTarget = (CNode*)getItem(arrow.Target().c_str());
