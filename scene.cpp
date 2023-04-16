@@ -14,7 +14,6 @@
 #include <sstream>
 
 #include "common.h"
-#include "str_utils.h"
 #include "tokenizer.h"
 #include "parser.h"
 #include <iostream>
@@ -23,28 +22,11 @@ static const char* x_token       = "x_";
 static const char* y_token       = "y_";
 static const char* id_token      = "id_";
 
-static const char* sEquality     = "==";
-static const char* sNEquality    = "!=";
-static const char* sOR           = "||";
-static const char* sAND          = "&&";
-
 static const char* sSet          = "set";
 
 static const char* sVoid         = "void";
 
 using namespace cat;
-
-//-----------------------------------------------------------------------------------------
-static std::string trim_sp_s(const std::string& string_, std::string::value_type symbol_)
-{
-   return trim_right(trim_left(string_, symbol_), symbol_);
-}
-
-//-----------------------------------------------------------------------------------------
-static std::string trim_sp(const std::string& string_)
-{
-   return trim_sp_s(string_, ' ');
-}
 
 //----------------------------------------------------------------------
 static std::string toID(const QGraphicsItem* const pItem_)
@@ -851,35 +833,23 @@ void Scene::New()
 }
 
 //----------------------------------------------------------------------
-bool eval_expr(const std::string& expr_, const std::list<Function>& fns_)
+bool eval_expr(TToken name_, TToken value_, TToken op_, const std::list<Function>& fns_)
 {
-   bool eq = expr_.find(sEquality ) != -1;
-   bool nq = expr_.find(sNEquality) != -1;
-
-   std::string split_factor;
-
-   if (eq)
-      split_factor = sEquality;
-   else if (nq)
-      split_factor = sNEquality;
-
-   auto cond_parts = split(expr_, split_factor, false);
-   if (cond_parts.size() != 2)
-      return false;
+   std::string name = std::get<std::string>(name_);
 
    bool (*cmp_d)(double left_, double right_);
    bool (*cmp_f)(float left_, float right_);
    bool (*cmp_i)(int left_, int right_);
    bool (*cmp_str)(const std::string & left_, const std::string & right_);
 
-   if (eq)
+   if       (std::holds_alternative<EQ>(op_))
    {
       cmp_d = [](double left_, double right_) { return left_ == right_; };
       cmp_f = [](float left_, float right_) { return left_ == right_; };
       cmp_i = [](int left_, int right_) { return left_ == right_; };
       cmp_str = [](const std::string& left_, const std::string& right_) { return left_ == right_; };
    }
-   else if (nq)
+   else if  (std::holds_alternative<NEQ>(op_))
    {
       cmp_d = [](double left_, double right_) { return left_ != right_; };
       cmp_f = [](float left_, float right_) { return left_ != right_; };
@@ -887,31 +857,25 @@ bool eval_expr(const std::string& expr_, const std::list<Function>& fns_)
       cmp_str = [](const std::string& left_, const std::string& right_) { return left_ != right_; };
    }
 
-   for (auto& it : cond_parts)
-      it = trim_sp(it);
-
-   auto& name = cond_parts[0];
-   auto& value = cond_parts[1];
-
    for (const Function& f : fns_)
    {
       if (f.first == name)
       {
          if (const double* pVal = std::get_if<double>(&f.second))
          {
-            return cmp_d(*pVal, std::stod(value));
+            return cmp_d(*pVal, std::get<double>(value_));
          }
          else if (const float* pVal = std::get_if<float>(&f.second))
          {
-            return cmp_f(*pVal, std::stof(value));
+            return cmp_f(*pVal, std::get<float>(value_));
          }
          else if (const int* pVal = std::get_if<int>(&f.second))
          {
-            return cmp_i(*pVal, std::stoi(value));
+            return cmp_i(*pVal, std::get<int>(value_));
          }
          else if (const std::string* pVal = std::get_if<std::string>(&f.second))
          {
-            return cmp_str(*pVal, value);
+            return cmp_str(*pVal, std::get<std::string>(value_));
          }
       }
    }
@@ -920,64 +884,32 @@ bool eval_expr(const std::string& expr_, const std::list<Function>& fns_)
 }
 
 //-----------------------------------------------------------------------------------------
-static StringVec csplit(const std::string& string_, const std::string& splitter_, bool keep_empty_, bool keep_splitter_)
+static bool rec_eval(std::list<TToken>::iterator it_, std::list<TToken>::iterator end_, const std::list<Function>& fns_)
 {
-   StringVec ret;
+   const TToken& name   = *it_; ++it_;
+   const TToken& op     = *it_; ++it_;
+   const TToken& val    = *it_; ++it_;
 
-   std::string remain = string_;
+   bool ret = eval_expr(name, val, op, fns_);
 
-   auto ind = remain.find(splitter_);
-   if (ind == -1)
-      return { string_ };
+   if (it_ == end_)
+      return ret;
 
-   while (ind != -1)
+   if       (std::holds_alternative<OR>(*it_))
    {
-      std::string chunk(std::string(remain.begin(), remain.begin() + ind));
-
-      bool isCopy = !chunk.empty() || keep_empty_;
-      if (isCopy)
-         ret.push_back(chunk);
-
-      if (keep_splitter_)
-         ret.push_back(std::string(remain.begin() + ind, remain.begin() + ind + splitter_.length()));
-
-      remain = std::string(remain.begin() + ind + splitter_.length(), remain.end());
-
-      ind = remain.find(splitter_);
-      if (ind == -1)
-      {
-         bool isCopy = !remain.empty() || keep_empty_;
-         if (isCopy)
-            ret.push_back(remain);
-      }
+      return ret || rec_eval(++it_, end_, fns_);
+   }
+   else if  (std::holds_alternative<AND>(*it_))
+   {
+      return ret && rec_eval(++it_, end_, fns_);
    }
 
-   return ret;
-}
-
-//----------------------------------------------------------------------
-StringVec chain_expr(const std::string& expr_)
-{
-   auto parts = csplit(expr_, sOR, false, true);
-
-   StringVec ret;
-   for (auto& it : parts)
-   {
-      auto sub_parts = csplit(it, sAND, false, true);
-      ret.insert(ret.end(), sub_parts.begin(), sub_parts.end());
-   }
-
-   for (auto& it : ret)
-      it = trim_sp(it);
-
-   return ret;
+   return false;
 }
 
 //----------------------------------------------------------------------
 void Scene::Filter(const QString& filter_)
 {
-   chain_expr(filter_.toStdString());
-
    std::string filter = filter_.toStdString();
 
    QList<QGraphicsItem*> nodes = items();
@@ -990,7 +922,7 @@ void Scene::Filter(const QString& filter_)
       return;
    }
 
-   auto expr_parts = chain_expr(filter);
+   std::list<TToken> tks = Tokenizer::Process(filter);
 
    for (QGraphicsItem* it : nodes)
    {
@@ -1002,7 +934,7 @@ void Scene::Filter(const QString& filter_)
 
       auto node_name = id.toString().toStdString();
 
-      Arrow::List arrows = m_pLCategory->QueryArrows("*::" + node_name + "->" + sSet);
+      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, node_name, sSet).AsQuery());
       if (arrows.empty())
          continue;
 
@@ -1012,30 +944,9 @@ void Scene::Filter(const QString& filter_)
 
       fns.push_back({ FunctionName(id_token), TSetValue(node_name) });
 
-      std::optional<bool> success;
-      for (size_t i = 0; i < expr_parts.size(); ++i)
-      {
-         if (i % 2 != 0)
-            continue;
+      bool success = rec_eval(tks.begin(), tks.end(), fns);
 
-         if (!success.has_value())
-         {
-            success = eval_expr(expr_parts[i], fns);
-         }
-         else
-         {
-            if (expr_parts[i - 1] == sOR)
-            {
-               success = success.value() || eval_expr(expr_parts[i], fns);
-            }
-            else if (expr_parts[i - 1] == sAND)
-            {
-               success = success.value() && eval_expr(expr_parts[i], fns);
-            }
-         }
-      }
-
-      pNode->SetVisibility(success.value());
+      pNode->SetVisibility(success);
    }
 }
 

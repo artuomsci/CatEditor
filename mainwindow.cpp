@@ -13,7 +13,6 @@
 #include "scene.h"
 #include "common.h"
 #include "ctable.h"
-#include "str_utils.h"
 
 using namespace cat;
 
