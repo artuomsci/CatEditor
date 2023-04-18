@@ -7,6 +7,7 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QMenu>
 #include <QAction>
+#include <QDebug>
 
 #include <type_traits>
 #include <assert.h>
@@ -37,7 +38,9 @@ static std::string toID(const QGraphicsItem* const pItem_)
 //----------------------------------------------------------------------
 static std::string rnd_uuid()
 {
-   return QUuid::createUuid().toString().mid(1, 36).toStdString();
+   QString ret = QUuid::createUuid().toString();
+
+   return "n" + ret.replace('-','_').mid(1, 36).toStdString();
 }
 
 //----------------------------------------------------------------------
@@ -887,7 +890,13 @@ bool eval_expr(TToken name_, TToken value_, TToken op_, const std::list<Function
 static bool rec_eval(std::list<TToken>::iterator it_, std::list<TToken>::iterator end_, const std::list<Function>& fns_)
 {
    const TToken& name   = *it_; ++it_;
+   if (it_ == end_)
+      throw std::invalid_argument("Incorrect expression");
+
    const TToken& op     = *it_; ++it_;
+   if (it_ == end_)
+      throw std::invalid_argument("Incorrect expression");
+
    const TToken& val    = *it_; ++it_;
 
    bool ret = eval_expr(name, val, op, fns_);
@@ -904,49 +913,53 @@ static bool rec_eval(std::list<TToken>::iterator it_, std::list<TToken>::iterato
       return ret && rec_eval(++it_, end_, fns_);
    }
 
-   return false;
+   throw std::invalid_argument("Incorrect expression");
 }
 
 //----------------------------------------------------------------------
 void Scene::Filter(const QString& filter_)
 {
-   std::string filter = filter_.toStdString();
+   try {
+      std::string filter = filter_.toStdString();
 
-   QList<QGraphicsItem*> nodes = items();
+      QList<QGraphicsItem*> nodes = items();
 
-   if (filter.empty())
-   {
-      for (QGraphicsItem* pNode : nodes)
-         pNode->setVisible(true);
+      if (filter.empty())
+      {
+         for (QGraphicsItem* pNode : nodes)
+            pNode->setVisible(true);
 
-      return;
-   }
+         return;
+      }
 
-   std::list<TToken> tks = Tokenizer::Process(filter);
+      std::list<TToken> tks = Tokenizer::Process(filter);
 
-   for (QGraphicsItem* it : nodes)
-   {
-      auto id = it->data(eID);
+      for (QGraphicsItem* it : nodes)
+      {
+         auto id = it->data(eID);
 
-      CNode* pNode = dynamic_cast<CNode*>(it);
-      if (!pNode)
-         continue;
+         CNode* pNode = dynamic_cast<CNode*>(it);
+         if (!pNode)
+            continue;
 
-      auto node_name = id.toString().toStdString();
+         auto node_name = id.toString().toStdString();
 
-      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, node_name, sSet).AsQuery());
-      if (arrows.empty())
-         continue;
+         Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, node_name, sSet).AsQuery());
+         if (arrows.empty())
+            continue;
 
-      const Arrow& arrow = arrows.front();
+         const Arrow& arrow = arrows.front();
 
-      std::list<Function> fns = function_values(arrow.Source(), arrow.Target(), m_pLCategory);
+         std::list<Function> fns = function_values(arrow.Source(), arrow.Target(), m_pLCategory);
 
-      fns.push_back({ FunctionName(id_token), TSetValue(node_name) });
+         fns.push_back({ FunctionName(id_token), TSetValue(node_name) });
 
-      bool success = rec_eval(tks.begin(), tks.end(), fns);
+         bool success = rec_eval(tks.begin(), tks.end(), fns);
 
-      pNode->SetVisibility(success);
+         pNode->SetVisibility(success);
+      }
+   }  catch (const std::invalid_argument& arg_) {
+      qDebug() << arg_.what();
    }
 }
 
