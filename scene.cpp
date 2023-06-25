@@ -13,11 +13,12 @@
 #include <assert.h>
 #include <fstream>
 #include <sstream>
+#include <iostream>
 
 #include "common.h"
 #include "tokenizer.h"
 #include "parser.h"
-#include <iostream>
+#include "../Cat/test/test.h"
 
 static const char* x_token       = "x_";
 static const char* y_token       = "y_";
@@ -50,13 +51,13 @@ static std::list<Function> function_values(const std::string& source_, const std
    if (target.empty())
       return std::list<Function>();
 
-   Arrow::List morphisms = pNode_->QueryArrows(Arrow(Arrow::EType::eMorphism, source_, target_, "*").AsQuery());
+   Arrow::List morphisms = pNode_->QueryArrows(Arrow(source_, target_, "*").AsQuery());
    if (morphisms.empty())
       return std::list<Function>();
 
    std::list<Function> fns;
 
-   for (const auto& function : morphisms.front().QueryArrows(Arrow(Arrow::EType::eFunction, "*", "*", "*").AsQuery()))
+   for (const auto& function : morphisms.front().QueryArrows(Arrow("*", "*", "*").AsQuery()))
    {
       auto vals = target.front().QueryNodes(function.Target());
       if (!vals.empty())
@@ -69,6 +70,8 @@ static std::list<Function> function_values(const std::string& source_, const std
 //----------------------------------------------------------------------
 Scene::Scene()
 {
+   test();
+
    Init();
 
    m_pMnu = new QMenu(NULL);
@@ -130,7 +133,7 @@ bool Scene::AddProperty2Node(QGraphicsItem* pItem_, const Function& property_)
 
    auto name = toID(pItem_);
 
-   Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, name, sSet, "*").AsQuery());
+   Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(name, sSet, "*").AsQuery());
    if (arrows.empty())
       return false;
 
@@ -140,7 +143,7 @@ bool Scene::AddProperty2Node(QGraphicsItem* pItem_, const Function& property_)
 
    auto target_set = rnd_uuid();
 
-   arrow.AddArrow(Arrow(Arrow::EType::eFunction, sVoid, target_set, fn_name));
+   arrow.AddArrow(Arrow(sVoid, target_set, fn_name));
 
    {
       Node::List nodes = m_pLCategory->QueryNodes(name);
@@ -187,7 +190,7 @@ void Scene::RemovePropertyFromNode(QGraphicsItem* pItem_, const cat::FunctionNam
    if (!pItem_ || !m_pLCategory)
       return;
 
-   Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, toID(pItem_), sSet, "*").AsQuery());
+   Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(toID(pItem_), sSet, "*").AsQuery());
    if (arrows.empty())
       return;
 
@@ -195,7 +198,7 @@ void Scene::RemovePropertyFromNode(QGraphicsItem* pItem_, const cat::FunctionNam
 
    m_pLCategory->EraseArrow(arrow.Name());
 
-   Arrow::List functions = arrow.QueryArrows(Arrow(Arrow::EType::eFunction, "*", "*", name_).AsQuery());
+   Arrow::List functions = arrow.QueryArrows(Arrow("*", "*", name_).AsQuery());
    if (functions.empty())
       return;
 
@@ -400,7 +403,7 @@ void Scene::slotActivated(QAction* pAction_)
 
       // outward
       {
-         Arrow::List new_arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, new_name, "*", "*").AsQuery());
+         Arrow::List new_arrows = m_pLCategory->QueryArrows(Arrow(new_name, "*", "*").AsQuery());
 
          for (Arrow& arrow : new_arrows)
          {
@@ -416,7 +419,7 @@ void Scene::slotActivated(QAction* pAction_)
 
       // inward
       {
-         Arrow::List new_arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, "*", new_name, "*").AsQuery());
+         Arrow::List new_arrows = m_pLCategory->QueryArrows(Arrow("*", new_name, "*").AsQuery());
 
          for (Arrow& arrow : new_arrows)
          {
@@ -440,7 +443,7 @@ void Scene::slotActivated(QAction* pAction_)
       if (m_pSource != source)
          std::swap(source, target);
 
-      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, toID(source), toID(target), "*").AsQuery());
+      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(toID(source), toID(target), "*").AsQuery());
       if (!arrows.empty())
       {
          for (const auto& it : arrows)
@@ -553,8 +556,8 @@ CArrow* Scene::createArrow(CNode* pSource_, CNode* pTarget_, const QString& name
    auto target_name = pTarget_->data(eID).toString();
 
    Arrow arrow = name_.isEmpty() ?
-      Arrow(Arrow::EType::eMorphism, source_name.toStdString(), target_name.toStdString()) :
-      Arrow(Arrow::EType::eMorphism, source_name.toStdString(), target_name.toStdString(), name_.toStdString());
+      Arrow(source_name.toStdString(), target_name.toStdString()) :
+      Arrow(source_name.toStdString(), target_name.toStdString(), name_.toStdString());
 
    Node::List nodes = m_pLCategory->QueryNodes(target_name.toStdString());
    if (nodes.empty())
@@ -564,7 +567,7 @@ CArrow* Scene::createArrow(CNode* pSource_, CNode* pTarget_, const QString& name
    {
       auto target_set = rnd_uuid();
 
-      arrow.AddArrow(Arrow(Arrow::EType::eFunction, sVoid, target_set, it.first));
+      arrow.AddArrow(Arrow(sVoid, target_set, it.first));
 
       if (!nodes.empty())
       {
@@ -619,7 +622,7 @@ void Scene::changeLabel(QGraphicsItem* pItem_) const
          return;
       }
 
-      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, node_name, sSet, "*").AsQuery());
+      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(node_name, sSet, "*").AsQuery());
       if (arrows.empty())
       {
          pItem->SetText("");
@@ -670,7 +673,7 @@ QMap<QString, QString> Scene::getRecord(QGraphicsItem* pItem_) const
 
       ret.insert("id", node_name);
 
-      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, node_name.toStdString(), sSet, "*").AsQuery());
+      Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(node_name.toStdString(), sSet, "*").AsQuery());
       if (arrows.empty())
          return ret;
 
@@ -797,7 +800,7 @@ bool Scene::SaveBinary(const QString& path_) const
    for (const auto& node : nodes)
       write2of(output, node.Name());
 
-   auto arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, "*", "*", "*").AsQuery());
+   auto arrows = m_pLCategory->QueryArrows(Arrow("*", "*", "*").AsQuery());
 
    sz = arrows.size() - nodes.size();
 
@@ -944,7 +947,7 @@ void Scene::Filter(const QString& filter_)
 
          auto node_name = id.toString().toStdString();
 
-         Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, node_name, sSet).AsQuery());
+         Arrow::List arrows = m_pLCategory->QueryArrows(Arrow(node_name, sSet).AsQuery());
          if (arrows.empty())
             continue;
 
@@ -1013,7 +1016,7 @@ bool Scene::Build(const QString& path_)
       connect(pItem, &CNode::positionChanged, this, &Scene::positionChanged);
    }
 
-   for (auto& arrow : m_pLCategory->QueryArrows(Arrow(Arrow::EType::eMorphism, "*", "*").AsQuery()))
+   for (auto& arrow : m_pLCategory->QueryArrows(Arrow("*", "*").AsQuery()))
    {
       CNode* pSource = (CNode*)getItem(arrow.Source().c_str());
       CNode* pTarget = (CNode*)getItem(arrow.Target().c_str());
